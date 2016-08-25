@@ -10,8 +10,8 @@ Dim MsComm1, objFSO, objFSX, mph, objLogFile, objLogSum, instring, done, OurDate
 Dim oldLowCO, oldhiWind, loWind, hiWind, avgWind, flgDate, samp, ttlWind
 Dim tSamps, tmph, pmph, ppmph
 
-const path = "C:\ProgramData\Sensors\"
-const pSum = "C:\ProgramData\Sensors\Summaries\"
+const path = "C:\ProgramData\Sensors\"   ' daily log files are stored here
+const pSum = "C:\ProgramData\Sensors\Summaries\"  ' single day data is stored here
 const logfile = "Analog485wind.log"
 const logSum = "Analog485wind.log" 
 const comEvSend = 1         ' enumeration of comm events
@@ -50,9 +50,9 @@ Do
 	tSamps = 0			' zeroize 10-sample counter
 	tmph = 0			' variable to hold total of 10 readings
 	pmph = 0			' variable to hold peak wind speed
-	Do While tSamps < 10  ' read analog value 10 times then average the total
-
-		MSComm1.Output = Chr(35) & "08" & Chr(13) 		' send '#08' to module 08 to read analog data	 	  
+	
+	Do While tSamps < 10  					' read analog value 10 times then average the total
+		MSComm1.Output = Chr(35) & "08" & Chr(13) 	' send '#08' to module 08 to read analog data	 	  
 		WScript.Sleep (100) ' give a chance for the module to respond
 
 		mph = CInt(0)
@@ -69,7 +69,7 @@ Do
 
 		' convert Analog Data to wind speed in mph
 		On Error Resume Next
-		If Len(instring) >3 Then		' 4014D outputs 4-1/2 digits
+		If Len(instring) >3 Then		' 4014D outputs 4-1/2 digits which represents 4-20ma
 			mph = (CSng(Right(instring,Len(instring) - 4))) * 4.5298  ' 2.025 m/s / ma * 2.23694 mph / m/s
 			If mph > pmph Then  ' keep track of peak wind reading 
 				pmph = mph
@@ -78,12 +78,12 @@ Do
 			tSamps = tSamps + 1
 		End If
 
-		WScript.Sleep (2500)  ' wait 5 secs for next 1 of 10 reads
-	Loop
+		WScript.Sleep (2500)  ' wait 5 secs (this 2.5 + other delays) for next 9 reads
+	Loop  ' loop until the wind speed has been read 10 times
 	
-	mph = tmph / 10		' divide total by 10 to get average reading
+	mph = tmph / 10		' then divide total by 10 to get average reading
 	
-	'------------------------ highs and lows --------------------------
+	'------------------------ highs, lows, and average  --------------------------
 	samp = samp + 1
 	ttlWind = ttlWind + mph
 	avgWind = ttlWind / samp
@@ -98,7 +98,7 @@ Do
 		ppmph = pmph
 	End If
 
-	'-------------- Save the data to log file, if greater than 4mph -------------------------------
+	'-------------- Save the data to log file, if greater than 2 mph -------------------------------
 	If mph > 2 or pmph > 3 Then
 		Call LogIt (Now & "    " & Round(mph,1) & "   " & Round(pmph,2) & "    " & Round(loWind,1) & " - " & Round(hiWind,1) & " - " & Round(ppmph,1) & "    Avg: " & Round(avgWind,2))
 	End If
@@ -106,12 +106,12 @@ Do
 	MSComm1.PortOpen = False
 	Wscript.DisconnectObject MSComm1  
 	Set MSComm1 = Nothing
-	WScript.Sleep (2000)
+	WScript.Sleep (2000)	' wait 2 seconds to make sure the comm port is closed
 	
 	'--------------------- see if we have reached midnight ----------------------
 	If flgDate <> Date Then
 		' print high and lows for the day
-		avgWind = ttlWind / samp
+		avgWind = ttlWind / samp  ' see what the average wind speed was for the entire day
 		
 		Set objFSX = CreateObject("Scripting.FileSystemObject")
 		Set objLogSum = objFSX.OpenTextFile(pSum & logSum, 8, True, 0)
@@ -120,7 +120,7 @@ Do
 		Set objLogSum = Nothing
 		Set objFSX  = Nothing
 		flgDate = Date  ' set comparison date to current date
-		ppmph = CSng(0)
+		ppmph = CSng(0)  ' reset all the wind speed varialbles for the next day
 		hiWind = CSng(0)
 		loWind = CSng(90)
 		avgWind = CSng(0)
@@ -129,14 +129,14 @@ Do
 	End If	
 	'-------------------------------------------------------------------------
 	
-	Wscript.Sleep (25500)	'// wait 1 minutes to run next scan
-Loop 
+	Wscript.Sleep (25500)	'// wait 1 minute (this 25.5 seconds + other delays) to run next scan
+Loop   ' loop indefinately unless the script craps out or is terminated
 
 
 Sub scomOpen ()
 	On Error Resume Next
 	
-	Set MSComm1 = CreateObject("MSCOMMLib.MSComm")
+	Set MSComm1 = CreateObject("MSCOMMLib.MSComm")		' this is what talks to the serial port
 	MSComm1.CommPort = 8   					' <------------------- COMM port number!
 	MSComm1.Settings = "9600,n,8,1"
 	MSComm1.InputLen = 0  					' read the entire buffer
@@ -146,7 +146,7 @@ Sub scomOpen ()
 	MSComm1.PortOpen = True
 	WScript.Sleep (2000)
 	
-	If Err.Number <> 0 Then
+	If Err.Number <> 0 Then    ' log comm errors so we know what happened
 		Call LogIt ("   COM " & MSComm1.CommPort & ": not opened!:  " & Err.Number)
 		Err.Clear
 		WScript.Sleep (10000)
@@ -161,10 +161,10 @@ Sub LogIt (LogString)
 	Set objFSO = CreateObject("Scripting.FileSystemObject")
 	Set objLogFile = objFSO.OpenTextFile(path & OurDate & logfile, 8, True, 0)
 	'-------------- Save the data to log file -----------------------------
-	objLogFile.Writeline (Now & LogString)
+	objLogFile.Writeline (Now & LogString)  ' every log entry will have the date and time in front
 	objLogFile.Close
 	 
-	Wscript.DisconnectObject objFSO 
+	Wscript.DisconnectObject objFSO 	' close the log file when not writing to it
 	Wscript.DisconnectObject objLogFile
 	Set objLogFile = Nothing
 	Set objFSO  = Nothing
