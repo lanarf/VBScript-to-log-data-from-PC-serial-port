@@ -1,6 +1,6 @@
 # VBScript-to-log-data-from-serial-port
 
-This is a little VBScript on my PC to log wind speed data from a remote wind speed sensor.  That was really the easy part; the hard part was getting the data from the sensor to the PC.  Although it has nothing at all to do with the VBScript I figured I'd detail what I had to do to get to that point.
+This is a little VBScript which runs continuosly on my PC to log wind speed data from a remotely located wind speed sensor.  The VBScript was really the easy part; the hard part was getting the data from the sensor to the PC.  Although it has nothing at all to do with the VBScript I figured I'd detail what I had to do to get to that point.
 
 I bought a wind speed sensor on eBay that has a 4-20ma analog output.  I had to mount the sensor on one side of my house but my PC is on the other side of the house so I needed to get the data from one side to the other.  I bought the 4-20ma version of the sensor since wire length would not be a problem as it would with the 0-5volt version (because of voltage drop).  I also figured I could actually string a twisted pair through the attic directly to the PC and bypass the network portion but that was really not practical.
 
